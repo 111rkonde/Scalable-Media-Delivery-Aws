@@ -14,16 +14,8 @@ const PORT = process.env.PORT || 3000;
 
 // Security middleware
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
-      fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
-      imgSrc: ["'self'", "data:", "https:"],
-      scriptSrc: ["'self'"],
-      connectSrc: ["'self'", "https://*.amazonaws.com"]
-    }
-  }
+  contentSecurityPolicy: false, // Disable CSP temporarily for mobile testing
+  crossOriginEmbedderPolicy: false
 }));
 app.use(cors({
   origin: [
@@ -40,7 +32,13 @@ app.use(cors({
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
+  message: 'Too many requests from this IP, please try again later.',
+  trustProxy: true,
+  skip: (req) => {
+    // Skip rate limiting for local network requests
+    const ip = req.ip || req.connection.remoteAddress;
+    return ip && (ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.'));
+  }
 });
 app.use('/api/', limiter);
 
@@ -295,7 +293,23 @@ app.get('/api/files/:key/info', async (req, res) => {
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    ip: req.ip,
+    userAgent: req.get('User-Agent'),
+    headers: req.headers
+  });
+});
+
+// Debug endpoint for mobile testing
+app.get('/api/debug', (req, res) => {
+  res.json({
+    message: 'Debug endpoint works!',
+    ip: req.ip,
+    headers: req.headers,
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Serve frontend for all other routes
