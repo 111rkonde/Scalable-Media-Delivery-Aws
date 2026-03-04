@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S3 Media Gallery</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="logo">
+                    <i class="fas fa-cloud"></i>
+                    S3 Media Gallery
+                </h1>
+                <button class="upload-btn" id="uploadBtn">
+                    <i class="fas fa-upload"></i>
+                    Upload Files
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <!-- Search and Filter Section -->
+            <section class="controls">
+                <div class="search-container">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="searchInput" placeholder="Search files...">
+                    </div>
+                </div>
+                
+                <div class="filter-container">
+                    <select id="typeFilter" class="filter-select">
+                        <option value="all">All Files</option>
+                        <option value="image">Images</option>
+                        <option value="video">Videos</option>
+                        <option value="audio">Audio</option>
+                    </select>
+                </div>
+            </section>
+
+            <!-- Stats Section -->
+            <section class="stats" id="statsSection">
+                <div class="stat-item">
+                    <i class="fas fa-file"></i>
+                    <span class="stat-value" id="totalFiles">0</span>
+                    <span class="stat-label">Total Files</span>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-image"></i>
+                    <span class="stat-value" id="imageCount">0</span>
+                    <span class="stat-label">Images</span>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-video"></i>
+                    <span class="stat-value" id="videoCount">0</span>
+                    <span class="stat-label">Videos</span>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-music"></i>
+                    <span class="stat-value" id="audioCount">0</span>
+                    <span class="stat-label">Audio</span>
+                </div>
+            </section>
+
+            <!-- Loading State -->
+            <div class="loading" id="loadingState">
+                <div class="spinner"></div>
+                <p>Loading files...</p>
+            </div>
+
+            <!-- Error State -->
+            <div class="error-state" id="errorState" style="display: none;">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p id="errorMessage">Failed to load files</p>
+                <button class="retry-btn" id="retryBtn">Retry</button>
+            </div>
+
+            <!-- Gallery Grid -->
+            <section class="gallery" id="gallery">
+                <div class="gallery-grid" id="galleryGrid">
+                    <!-- Files will be dynamically added here -->
+                </div>
+            </section>
+
+            <!-- Pagination -->
+            <section class="pagination" id="pagination" style="display: none;">
+                <button class="pagination-btn" id="prevBtn" disabled>
+                    <i class="fas fa-chevron-left"></i>
+                    Previous
+                </button>
+                <span class="page-info" id="pageInfo">Page 1 of 1</span>
+                <button class="pagination-btn" id="nextBtn" disabled>
+                    Next
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </section>
+        </div>
+    </main>
+
+    <!-- Upload Modal -->
+    <div class="modal" id="uploadModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Upload Files</h2>
+                <button class="close-btn" id="closeUploadModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="upload-area" id="uploadArea">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <h3>Drag & Drop files here</h3>
+                    <p>or</p>
+                    <button class="browse-btn" id="browseBtn">Browse Files</button>
+                    <input type="file" id="fileInput" multiple accept="image/*,video/*,audio/*">
+                    <p class="upload-info">Supported formats: Images, Videos, Audio (Max 50MB per file)</p>
+                </div>
+                <div class="upload-progress" id="uploadProgress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <p class="progress-text" id="progressText">Uploading...</p>
+                </div>
+                <div class="upload-list" id="uploadList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div class="modal" id="previewModal">
+        <div class="modal-content preview-modal">
+            <div class="modal-header">
+                <h2 id="previewTitle">File Preview</h2>
+                <button class="close-btn" id="closePreviewModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="preview-container" id="previewContainer">
+                    <!-- Preview content will be dynamically added here -->
+                </div>
+                <div class="preview-actions">
+                    <button class="action-btn download-btn" id="downloadBtn">
+                        <i class="fas fa-download"></i>
+                        Download
+                    </button>
+                    <button class="action-btn delete-btn" id="deleteBtn">
+                        <i class="fas fa-trash"></i>
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">
+        <div class="toast-content">
+            <i class="fas fa-check-circle" id="toastIcon"></i>
+            <span id="toastMessage">Success!</span>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
