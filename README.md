@@ -6,7 +6,7 @@ A secure, modern media gallery website that connects to Amazon S3 for storing an
 
 - **Secure S3 Integration**: Private bucket with signed URLs
 - **Media Support**: Images, videos, and audio files
-- **File Upload**: Drag & drop or browse to upload files
+- **File Upload**: Drag & drop or browse to upload files up to 5GB
 - **Search & Filter**: Search by filename and filter by file type
 - **Responsive Design**: Works on desktop and mobile devices
 - **Modern UI**: Clean, gradient-based design with smooth animations
@@ -117,7 +117,7 @@ The application will be available at `http://localhost:3000`
 - `DELETE /api/files/:key` - Delete a file
 
 ### Upload
-- `POST /api/upload` - Direct file upload (for files up to 50MB)
+- `POST /api/upload` - Direct file upload (for files up to 5GB)
 - `POST /api/upload-url` - Get pre-signed upload URL
 
 ### Utility
@@ -140,7 +140,7 @@ The application will be available at `http://localhost:3000`
 - **Rate Limiting**: Prevents abuse of API endpoints
 - **CORS Protection**: Controls cross-origin requests
 - **Helmet.js**: Security headers for Express
-- **File Size Limits**: 50MB maximum file size
+- **File Size Limits**: 5GB maximum file size
 - **Input Validation**: Validates all user inputs
 
 ## Supported File Types

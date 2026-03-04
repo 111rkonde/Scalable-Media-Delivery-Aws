@@ -314,6 +314,22 @@ class MediaGallery {
     async handleFileSelect(files) {
         if (files.length === 0) return;
 
+        // Validate file sizes (5GB limit)
+        const maxSize = 5 * 1024 * 1024 * 1024; // 5GB
+        const validFiles = [];
+        
+        for (const file of files) {
+            if (file.size > maxSize) {
+                this.showToast(`${file.name} exceeds 5GB limit`, 'error');
+                continue;
+            }
+            validFiles.push(file);
+        }
+
+        if (validFiles.length === 0) {
+            return;
+        }
+
         const uploadList = document.getElementById('uploadList');
         const progressContainer = document.getElementById('uploadProgress');
         const progressFill = document.getElementById('progressFill');
@@ -322,14 +338,14 @@ class MediaGallery {
         progressContainer.style.display = 'block';
         uploadList.innerHTML = '';
 
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
+        for (let i = 0; i < validFiles.length; i++) {
+            const file = validFiles[i];
             const uploadItem = this.createUploadItem(file);
             uploadList.appendChild(uploadItem);
 
             try {
                 progressText.textContent = `Uploading ${file.name}...`;
-                progressFill.style.width = `${((i + 1) / files.length) * 100}%`;
+                progressFill.style.width = `${((i + 1) / validFiles.length) * 100}%`;
 
                 await this.uploadFile(file, uploadItem);
                 

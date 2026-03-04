@@ -28,8 +28,8 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // Body parsing middleware
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Serve static frontend
 app.use(express.static(path.join(__dirname, '../public')));
@@ -142,9 +142,9 @@ app.post('/api/upload-url', async (req, res) => {
       return res.status(400).json({ error: 'File name and type are required' });
     }
     
-    // Validate file size (50MB limit)
-    if (fileSize && fileSize > 50 * 1024 * 1024) {
-      return res.status(400).json({ error: 'File size exceeds 50MB limit' });
+    // Validate file size (5GB limit)
+    if (fileSize && fileSize > 5 * 1024 * 1024 * 1024) {
+      return res.status(400).json({ error: 'File size exceeds 5GB limit' });
     }
     
     // Generate unique key
@@ -176,7 +176,7 @@ app.post('/api/upload-url', async (req, res) => {
 
 // Direct file upload endpoint (for smaller files)
 app.post('/api/upload', multer({ 
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+  limits: { fileSize: 5 * 1024 * 1024 * 1024 }, // 5GB
   storage: multer.memoryStorage()
 }).single('file'), async (req, res) => {
   try {
