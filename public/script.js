@@ -195,15 +195,7 @@ class MediaGallery {
                 mediaContent = `<img src="${file.url}" alt="${fileName}" class="gallery-item-image">`;
                 break;
             case 'video':
-                mediaContent = `
-                    <div class="video-container">
-                        <video src="${file.url}" class="gallery-item-video" poster="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjIyNSIgdmlld0JveD0iMCAwIDQwMCAyMjUiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9InZpZGVvQmciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAlIiBzdHlsZT0ic3RvcC1jb2xvcjojNjY3ZWVhO3N0b3Atb3BhY2l0eToxIiAvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0eWxlPSJzdG9wLWNvbG9yOiM3NjRiYTI7c3RvcC1vcGFjaXR5OjEiIC8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjIyNSIgZmlsbD0idXJsKCN2aWRlb0JnKSIvPgogIDxjaXJjbGUgY3g9IjIwMCIgY3k9IjkwIiByPSIzMCIgZmlsbD0icmdiYSgyNTUsIDI1NSwgMjU1LCAwLjMpIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8cG9seWdvbiBwb2ludHM9IjE4NSw3NSAxODUsMTA1IDIxNSw5MCIgZmlsbD0id2hpdGUiLz4KICA8dGV4dCB4PSIyMDAiIHk9IjE1MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZm9udC13ZWlnaHQ9IjYwMCI+VmlkZW88L3RleHQ+CiAgPHRleHQgeD0iMjAwIiB5PSIxNzUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9InJnYmEoMjU1LCAyNTUsIDI1NSwgMC44KSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjE0Ij5DbGljayB0byBwbGF5PC90ZXh0Pgo8L3N2Zz4=">
-                            <div class="video-play-overlay">
-                                <i class="fas fa-play"></i>
-                            </div>
-                        </video>
-                    </div>
-                `;
+                mediaContent = `<video src="${file.url}" class="gallery-item-video"></video>`;
                 break;
             case 'audio':
                 mediaContent = `
