@@ -143,7 +143,7 @@ body {
 
 .search-box input {
     width: 100%;
-    padding: 0.75rem 1rem 0.75rem 3rem;
+    padding: 1rem 1rem 0.75rem 3rem;
     border: 2px solid rgba(255, 255, 255, 0.1);
     border-radius: 50px;
     font-size: 1rem;
@@ -151,16 +151,25 @@ body {
     color: #ffffff;
     transition: all 0.3s ease;
     backdrop-filter: blur(10px);
+    font-weight: 500;
+    letter-spacing: 0.5px;
 }
 
 .search-box input::placeholder {
     color: rgba(255, 255, 255, 0.6);
+    font-style: italic;
 }
 
 .search-box input:focus {
     outline: none;
     border-color: #e94560;
     box-shadow: 0 0 20px rgba(233, 69, 96, 0.3);
+    background: rgba(15, 52, 96, 0.8);
+    transform: translateY(-2px);
+}
+
+.search-box input:hover {
+    border-color: rgba(233, 69, 96, 0.5);
     background: rgba(15, 52, 96, 0.8);
 }
 
@@ -179,7 +188,7 @@ body {
 
 .filter-select {
     width: 100%;
-    padding: 0.75rem 1rem;
+    padding: 1rem 1.2rem;
     border: 2px solid rgba(255, 255, 255, 0.1);
     border-radius: 50px;
     font-size: 1rem;
@@ -188,18 +197,37 @@ body {
     cursor: pointer;
     transition: all 0.3s ease;
     backdrop-filter: blur(10px);
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
 }
 
 .filter-select:focus {
     outline: none;
     border-color: #e94560;
     box-shadow: 0 0 20px rgba(233, 69, 96, 0.3);
+    background: rgba(15, 52, 96, 0.8);
+    transform: translateY(-2px);
+}
+
+.filter-select:hover {
+    border-color: rgba(233, 69, 96, 0.5);
+    background: rgba(15, 52, 96, 0.8);
 }
 
 .filter-select option {
     background: #1a1a2e;
     color: #ffffff;
-    padding: 0.5rem;
+    padding: 0.75rem 0.5rem;
+    border: none;
+    font-weight: 500;
+}
+
+.filter-select option:hover {
+    background: rgba(233, 69, 96, 0.2);
+    color: #ffffff;
 }
 
 /* Stats Section */
