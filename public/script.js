@@ -1,6 +1,5 @@
 class MediaGallery {
     constructor() {
-        console.log('MediaGallery constructor called');
         this.files = [];
         this.currentPage = 1;
         this.totalPages = 1;
@@ -12,7 +11,6 @@ class MediaGallery {
     }
 
     init() {
-        console.log('MediaGallery init called');
         this.bindEvents();
         this.loadFiles();
     }
@@ -139,7 +137,6 @@ class MediaGallery {
                 search: this.currentSearch
             });
 
-            console.log('Loading files with params:', params.toString());
             const response = await fetch(`/api/files?${params}`);
             
             if (!response.ok) {
@@ -147,12 +144,10 @@ class MediaGallery {
             }
 
             const data = await response.json();
-            console.log('Files loaded:', data);
             
             this.files = data.files;
             this.totalPages = data.pagination.totalPages;
             
-            console.log('Rendering gallery with files:', this.files);
             this.renderGallery();
             this.updatePagination(data.pagination);
             this.updateStats(data.files);
@@ -168,9 +163,6 @@ class MediaGallery {
     renderGallery() {
         const galleryGrid = document.getElementById('galleryGrid');
         
-        console.log('renderGallery called, files:', this.files);
-        console.log('Gallery grid element:', galleryGrid);
-        
         if (this.files.length === 0) {
             galleryGrid.innerHTML = `
                 <div style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
@@ -182,36 +174,25 @@ class MediaGallery {
             return;
         }
 
-        const galleryHTML = this.files.map(file => this.createGalleryItem(file)).join('');
-        console.log('Gallery HTML before setting:', galleryHTML);
-        
-        galleryGrid.innerHTML = galleryHTML;
-        console.log('Gallery HTML set, current innerHTML:', galleryGrid.innerHTML);
+        galleryGrid.innerHTML = this.files.map(file => this.createGalleryItem(file)).join('');
         
         // Add click events to gallery items
-        const galleryItems = galleryGrid.querySelectorAll('.gallery-item');
-        console.log('Found gallery items:', galleryItems.length);
-        
-        galleryItems.forEach((item, index) => {
+        galleryGrid.querySelectorAll('.gallery-item').forEach((item, index) => {
             item.addEventListener('click', () => {
                 this.showPreview(this.files[index]);
             });
         });
-        
-        console.log('Click events added to gallery items');
     }
 
     createGalleryItem(file) {
         const fileName = file.key.split('/').pop();
         const fileSize = this.formatFileSize(file.size);
         
-        console.log('Creating gallery item for file:', file);
-        
         let mediaContent = '';
         
         switch (file.type) {
             case 'image':
-                mediaContent = `<img src="${file.url}" alt="${fileName}" class="gallery-item-image" onload="console.log('Image loaded successfully:', this.src)" onerror="console.log('Image failed to load:', this.src)">`;
+                mediaContent = `<img src="${file.url}" alt="${fileName}" class="gallery-item-image">`;
                 break;
             case 'video':
                 mediaContent = `<video src="${file.url}" class="gallery-item-video"></video>`;
@@ -231,7 +212,7 @@ class MediaGallery {
                 `;
         }
 
-        const itemHtml = `
+        return `
             <div class="gallery-item" data-key="${file.key}">
                 ${mediaContent}
                 <div class="gallery-item-info">
@@ -243,9 +224,6 @@ class MediaGallery {
                 </div>
             </div>
         `;
-        
-        console.log('Gallery item HTML created:', itemHtml);
-        return itemHtml;
     }
 
     updatePagination(pagination) {
@@ -492,15 +470,5 @@ class MediaGallery {
 
 // Initialize the gallery when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM loaded, initializing MediaGallery');
     new MediaGallery();
 });
-
-// Also try to initialize immediately in case DOM is already loaded
-console.log('Script loaded, checking if DOM is ready');
-if (document.readyState === 'loading') {
-    console.log('DOM is still loading');
-} else {
-    console.log('DOM is already loaded, initializing MediaGallery');
-    new MediaGallery();
-}
