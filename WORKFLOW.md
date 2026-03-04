@@ -1,4 +1,4 @@
-# Application Workflow & Data Flow
+# S3 Media Gallery - Application Workflow & Data Flow
 
 This document explains how the S3 Media Gallery application works, from user interactions to data flow through the system.
 
@@ -11,12 +11,18 @@ This document explains how the S3 Media Gallery application works, from user int
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
+**Current Implementation:**
+- **Open Access**: No authentication required
+- **Shared Storage**: All users see the same files
+- **5GB Upload Limit**: Large file support
+- **Direct Upload**: Multer with memory storage
+
 ## 🔄 Complete Data Flow
 
 ### 1. Initial Page Load
 
 ```
-User visits website
+User visits website (http://localhost:3000)
         ↓
 Browser loads index.html, styles.css, script.js
         ↓
@@ -24,40 +30,53 @@ JavaScript initializes MediaGallery class
         ↓
 Calls API: GET /api/files
         ↓
-Backend fetches file list from S3
+Backend fetches file list from S3 bucket
         ↓
-S3 returns file metadata
+S3 returns file metadata (keys, sizes, dates)
         ↓
-Backend generates signed URLs for each file
+Backend generates signed URLs for each file (1-hour expiry)
         ↓
-Frontend renders gallery grid
+Frontend renders gallery grid with images/videos/audio
 ```
+
+**Key Components:**
+- No login required - direct access to gallery
+- Files stored in `uploads/` folder in S3
+- Signed URLs provide secure temporary access
 
 ### 2. File Upload Process
 
 ```
 User clicks "Upload Files" button
         ↓
-Upload modal opens
+Upload modal opens with drag & drop area
         ↓
-User drags & drops or selects files
+User drags & drops or selects files (up to 5GB each)
         ↓
-Frontend validates file size and type
+Frontend validates file size (5GB limit)
         ↓
 FormData created and sent to API: POST /api/upload
         ↓
 Backend receives file via multer middleware
         ↓
-AWS SDK uploads file to S3 bucket
+File stored in memory buffer
         ↓
-S3 stores file and returns success
+Backend generates unique key: uploads/timestamp-random-filename
         ↓
-Backend responds with file metadata
+Backend uploads to S3 with ACL: 'private'
         ↓
-Frontend shows success message
+S3 stores file and returns metadata
         ↓
-Gallery refreshes to show new file
+Backend responds with success info
+        ↓
+Frontend shows upload progress and refreshes gallery
 ```
+
+**Upload Validation:**
+- Frontend: 5GB size limit check
+- Backend: Multer limit set to 5GB
+- File types: Images, videos, audio, documents
+- Storage: Memory buffer (for files up to 5GB)
 
 ### 3. File Preview Process
 
@@ -66,88 +85,80 @@ User clicks on gallery item
         ↓
 Frontend opens preview modal
         ↓
-Media element rendered based on file type:
-   - Image: <img> tag with signed URL
-   - Video: <video> tag with controls
-   - Audio: <audio> tag with controls
+Displays media using signed URL
         ↓
-User can play/view media directly
+Options: Download, Delete, Close
         ↓
-Download/Delete buttons available
+User can interact with media player
 ```
 
-## 🔐 Security Flow
-
-### Signed URL Generation
+### 4. File Download Process
 
 ```
-Backend needs to provide file access
+User clicks download button in preview
         ↓
-Creates S3 signed URL request:
-   - Bucket: web-project-666
-   - Key: filename
-   - Expires: 1 hour
-   - Method: GET
+Frontend creates download link with signed URL
         ↓
-AWS SDK generates temporary URL
+Browser downloads file directly from S3
         ↓
-URL returned to frontend
-        ↓
-Frontend uses URL for media display
-        ↓
-URL expires after 1 hour
+Signed URL expires after 1 hour
 ```
 
-### Authentication & Authorization
+### 5. File Delete Process
 
 ```
-No user authentication required
+User clicks delete button in preview
         ↓
-Security through obscurity:
-   - S3 bucket is private
-   - Only signed URLs work
-   - URLs expire quickly
+Confirmation dialog appears
         ↓
-Rate limiting prevents abuse
+If confirmed: DELETE /api/files/:key
         ↓
-CORS restricts cross-origin access
+Backend calls S3: deleteObject()
         ↓
-Helmet.js adds security headers
+S3 removes file permanently
+        ↓
+Backend responds with success
+        ↓
+Frontend closes preview and refreshes gallery
 ```
 
-## 📊 API Endpoints & Data Flow
+## 🔧 Backend API Endpoints
 
 ### GET /api/files
 
-**Request:**
-```javascript
-GET /api/files?page=1&limit=20&type=all&search=example
-```
+**Query Parameters:**
+- `page`: Page number (default: 1)
+- `limit`: Files per page (default: 50)
+- `type`: Filter by type ('image', 'video', 'audio', 'all')
+- `search`: Search query for filenames
 
 **Backend Process:**
-1. Validates query parameters
-2. Calls S3: `listObjectsV2()`
-3. Filters by type if specified
-4. Searches filenames if query provided
-5. Implements pagination
-6. Generates signed URLs for each file
-7. Returns paginated response
+1. Calls S3: `listObjectsV2()` with MaxKeys: 1000
+2. Filters files by type and search criteria
+3. Adds metadata (size, type, extension)
+4. Implements pagination
+5. Generates signed URLs for each file
+6. Returns paginated response
 
 **Response:**
 ```json
 {
   "files": [
     {
-      "key": "video.mp4",
-      "size": 12345678,
-      "type": "video",
-      "url": "https://signed-url-for-1-hour"
+      "key": "uploads/1234567890-abc123-image.jpg",
+      "size": 1024000,
+      "lastModified": "2026-03-04T08:46:41.000Z",
+      "type": "image",
+      "extension": ".jpg",
+      "url": "https://s3.amazonaws.com/.../image.jpg?X-Amz-Signature=..."
     }
   ],
   "pagination": {
     "currentPage": 1,
-    "totalPages": 5,
-    "totalFiles": 100
+    "totalPages": 1,
+    "totalFiles": 2,
+    "hasNext": false,
+    "hasPrev": false
   }
 }
 ```
@@ -155,18 +166,14 @@ GET /api/files?page=1&limit=20&type=all&search=example
 ### POST /api/upload
 
 **Request:**
-```javascript
-POST /api/upload
-Content-Type: multipart/form-data
-Body: FormData with file
-```
+- Content-Type: `multipart/form-data`
+- File: Binary file data (up to 5GB)
 
 **Backend Process:**
-1. Multer middleware validates and receives file
-2. Generates unique S3 key: `uploads/timestamp-random-filename`
-3. Calls S3: `upload()` with file buffer
-4. S3 stores file and returns metadata
-5. Backend responds with success info
+1. Multer middleware validates file size (5GB limit)
+2. Generates unique key with timestamp and random string
+3. Uploads to S3 with ACL: 'private'
+4. Returns success response with file metadata
 
 **Response:**
 ```json
@@ -191,7 +198,23 @@ DELETE /api/files/uploads%2Fimage.jpg
 3. S3 removes file permanently
 4. Backend responds with success
 
-## 🎯 Frontend Component Flow
+### GET /api/files/:key/info
+
+**Backend Process:**
+1. Calls S3: `headObject()` to get file metadata
+2. Returns detailed file information
+
+### GET /api/health
+
+**Response:**
+```json
+{
+  "status": "OK",
+  "timestamp": "2026-03-04T08:46:41.000Z"
+}
+```
+
+## 🎨 Frontend Component Flow
 
 ### MediaGallery Class Initialization
 
@@ -202,276 +225,345 @@ class MediaGallery {
     this.currentPage = 1;
     this.currentFilter = 'all';
     this.currentSearch = '';
+    this.currentPreviewFile = null;
     
-    this.init(); // Binds events, loads files
+    this.init();
+  }
+
+  init() {
+    this.bindEvents();
+    this.loadFiles();
   }
 }
 ```
 
-### Event Handling Flow
-
-```
-User Action → Event Listener → Method Call → API Request → UI Update
-```
-
-**Examples:**
-- Search input → `debounceSearch()` → `loadFiles()` → Filtered gallery
-- Filter dropdown → `loadFiles()` → Filtered gallery
-- Pagination click → `loadFiles()` → New page
-- Upload button → `showUploadModal()` → Modal display
-
-### Rendering Flow
+### Event Binding
 
 ```javascript
-loadFiles() → renderGallery() → createGalleryItem() → DOM update
+bindEvents() {
+  // Upload button
+  document.getElementById('uploadBtn').addEventListener('click', () => {
+    this.showUploadModal();
+  });
+
+  // File selection
+  document.getElementById('fileInput').addEventListener('change', (e) => {
+    this.handleFileSelect(e.target.files);
+  });
+
+  // Drag and drop
+  const uploadArea = document.getElementById('uploadArea');
+  uploadArea.addEventListener('drop', (e) => {
+    this.handleFileSelect(e.dataTransfer.files);
+  });
+
+  // Search and filter
+  document.getElementById('searchInput').addEventListener('input', (e) => {
+    this.currentSearch = e.target.value;
+    this.debounceSearch();
+  });
+
+  // Pagination
+  document.getElementById('nextBtn').addEventListener('click', () => {
+    if (this.currentPage < this.totalPages) {
+      this.currentPage++;
+      this.loadFiles();
+    }
+  });
+}
 ```
 
-Each gallery item includes:
-- File preview (image thumbnail, video placeholder, audio icon)
-- File metadata (name, size, type badge)
-- Click event for preview modal
+### File Upload Handling
+
+```javascript
+async handleFileSelect(files) {
+  // Validate file sizes (5GB limit)
+  const maxSize = 5 * 1024 * 1024 * 1024; // 5GB
+  const validFiles = [];
+  
+  for (const file of files) {
+    if (file.size > maxSize) {
+      this.showToast(`${file.name} exceeds 5GB limit`, 'error');
+      continue;
+    }
+    validFiles.push(file);
+  }
+
+  // Upload each file with progress
+  for (let i = 0; i < validFiles.length; i++) {
+    const file = validFiles[i];
+    await this.uploadFile(file, uploadItem);
+  }
+}
+
+async uploadFile(file, uploadItem) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch('/api/upload', {
+    method: 'POST',
+    body: formData
+  });
+
+  const result = await response.json();
+  this.updateUploadItem(uploadItem, file.name, 'success');
+  return result;
+}
+```
+
+### Gallery Rendering
+
+```javascript
+renderGallery() {
+  const galleryGrid = document.getElementById('galleryGrid');
+  
+  if (this.files.length === 0) {
+    galleryGrid.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
+        <i class="fas fa-folder-open" style="font-size: 3rem; color: #667eea;"></i>
+        <h3>No files found</h3>
+        <p>Upload some files to get started!</p>
+      </div>
+    `;
+    return;
+  }
+
+  galleryGrid.innerHTML = this.files.map(file => this.createGalleryItem(file)).join('');
+  
+  // Add click events to gallery items
+  galleryGrid.querySelectorAll('.gallery-item').forEach((item, index) => {
+    item.addEventListener('click', () => {
+      this.showPreview(this.files[index]);
+    });
+  });
+}
+```
+
+## 🔒 Security Flow
+
+### 1. S3 Security
+
+```
+Private S3 Bucket (ACL: private)
+        ↓
+Files not publicly accessible
+        ↓
+Signed URLs provide temporary access (1 hour)
+        ↓
+AWS IAM user with limited permissions
+```
+
+**IAM Permissions:**
+- `s3:ListBucket` - List files
+- `s3:GetObject` - Download files
+- `s3:PutObject` - Upload files
+- `s3:DeleteObject` - Delete files
+
+### 2. Application Security
+
+```
+Helmet.js - Security headers
+        ↓
+CORS - Cross-origin request control
+        ↓
+Rate Limiting - Prevent abuse (100 requests/15min)
+        ↓
+File Size Limits - 5GB maximum
+        ↓
+Input Validation - All user inputs validated
+```
+
+## 📁 File Storage Structure
+
+### S3 Bucket Organization
+
+```
+web-project-666/
+└── uploads/
+    ├── 1672614003064-vff2nd-WIN_20260128_09_10_18_Pro.jpg
+    ├── 1672614003810-qhsyro-WIN_20260301_15_27_01_Pro.jpg
+    ├── 1672614004567-rtyuio-video.mp4
+    └── 1672614005234-ghjklm-audio.mp3
+```
+
+**File Naming Convention:**
+- Format: `timestamp-randomString-originalName`
+- Timestamp: Unix timestamp for uniqueness
+- Random: 6-character random string
+- Original: Preserves original filename
+
+## 🎯 User Journey Scenarios
+
+### Scenario 1: First Time User
+
+1. **Visit Website**: User goes to `http://localhost:3000`
+2. **View Gallery**: Sees existing files in gallery grid
+3. **Upload Files**: Clicks upload button, drags files
+4. **File Validation**: System checks file sizes (5GB limit)
+5. **Upload Progress**: Shows progress bar for each file
+6. **Gallery Refresh**: Files appear in gallery after upload
+7. **Media Interaction**: Click files to preview, download, or delete
+
+### Scenario 2: File Management
+
+1. **Search Files**: Uses search bar to find specific files
+2. **Filter by Type**: Selects image/video/audio filter
+3. **Pagination**: Navigates through multiple pages
+4. **Preview Media**: Clicks file to open preview modal
+5. **Download**: Clicks download button to save file
+6. **Delete**: Removes unwanted files with confirmation
+
+### Scenario 3: Large File Upload
+
+1. **Select Large File**: Chooses file up to 5GB
+2. **Validation**: Frontend checks file size
+3. **Upload Process**: File uploaded via memory buffer
+4. **Progress Tracking**: Visual progress indicator
+5. **Success Confirmation**: File appears in gallery
 
 ## 🔄 Error Handling Flow
 
 ### Frontend Errors
 
 ```
-API request fails
+File Upload Errors
         ↓
-.catch() block executed
+Show toast notification with error message
         ↓
-showError() method called
-        ↓
-Error state displayed
-        ↓
-Retry button available
+User can retry or select different files
 ```
 
 ### Backend Errors
 
 ```
-AWS SDK error occurs
+S3 API Errors
         ↓
-try/catch block catches error
+Log error details
         ↓
-Error logged to console
+Return 500 status with error message
         ↓
-500 response sent to frontend
-        ↓
-Frontend shows error message
+Frontend shows error toast
 ```
 
-### Common Error Scenarios
-
-1. **S3 Access Denied**: Check IAM permissions
-2. **File Too Large**: 50MB limit enforced
-3. **Invalid File Type**: Supported formats only
-4. **Network Error**: Retry mechanism available
-5. **Rate Limit Exceeded**: 429 response with retry info
-
-## 📱 Mobile vs Desktop Flow
-
-### Responsive Design Flow
+### Network Errors
 
 ```
-Page loads
+Connection Issues
         ↓
-CSS media queries apply
-        ↓
-Layout adjusts to screen size:
-   - Desktop: 4-column grid
-   - Tablet: 2-3 column grid
-   - Mobile: 1-2 column grid
-        ↓
-Touch events enabled on mobile
-        ↓
-Modal adapts to screen size
-```
-
-## 🚀 Performance Optimization Flow
-
-### Loading Performance
-
-```
-User requests page
-        ↓
-Static assets served from Express
-        ↓
-Images lazy-loaded as needed
-        ↓
-Pagination limits initial load
-        ↓
-Signed URLs cached for 1 hour
-```
-
-### Upload Performance
-
-```
-User selects files
-        ↓
-Files validated client-side
-        ↓
-Progress bar shows upload status
-        ↓
-Multiple files uploaded sequentially
-        ↓
-Gallery refreshes after all uploads
-```
-
-## 🔍 Search & Filter Flow
-
-### Search Process
-
-```
-User types in search box
-        ↓
-debounceSearch() waits 300ms
-        ↓
-loadFiles() called with search query
-        ↓
-Backend filters S3 results
-        ↓
-Matching files returned
-        ↓
-Gallery updates with filtered results
-```
-
-### Filter Process
-
-```
-User selects file type filter
-        ↓
-loadFiles() called with type parameter
-        ↓
-Backend filters by MIME type
-        ↓
-Gallery shows only selected type
-```
-
-## 📊 Statistics Flow
-
-```
-Files loaded from API
-        ↓
-updateStats() method called
-        ↓
-Counts calculated:
-   - Total files
-   - Images count
-   - Videos count
-   - Audio count
-        ↓
-Stats dashboard updated
-```
-
-## 🎨 UI State Management
-
-### Loading States
-
-```
-API request in progress
-        ↓
-showLoading() displays spinner
-        ↓
-Gallery hidden during load
-        ↓
-hideLoading() when complete
-```
-
-### Modal States
-
-```
-Upload button clicked
-        ↓
-showUploadModal() → Modal visible
-        ↓
-File upload completes
-        ↓
-hideUploadModal() → Modal hidden
-```
-
-### Error States
-
-```
-API error occurs
-        ↓
-showError() displays error message
+Frontend shows "Failed to load files" message
         ↓
 Retry button available
         ↓
-User can retry operation
+User can attempt to reload
 ```
 
-## 🔧 Configuration Flow
+## 📊 Performance Optimization
 
-### Environment Variables
-
-```
-Application starts
-        ↓
-dotenv loads .env file
-        ↓
-AWS SDK configured with credentials
-        ↓
-Express server starts
-        ↓
-CORS and security middleware applied
-```
-
-### AWS SDK Configuration
+### Frontend Optimization
 
 ```
-dotenv loads AWS credentials
+Lazy Loading
         ↓
-new AWS.S3() created with config
+Images load as needed
         ↓
-All S3 operations use these credentials
+Reduces initial page load time
+
+Debounced Search
         ↓
-Signed URLs generated with same config
+300ms delay on search input
+        ↓
+Reduces API calls
+
+Pagination
+        ↓
+Limits files per page (50)
+        ↓
+Improves rendering performance
 ```
 
-## 📈 Scalability Considerations
+### Backend Optimization
+
+```
+Signed URL Caching
+        ↓
+URLs valid for 1 hour
+        ↓
+Reduces S3 API calls
+
+Efficient S3 Queries
+        ↓
+MaxKeys: 1000 per request
+        ↓
+Minimizes S3 list operations
+
+Memory Management
+        ↓
+Files processed in memory
+        ↓
+Fast upload for files up to 5GB
+```
+
+## 🚀 Scalability Considerations
 
 ### Current Limitations
 
-- Single server instance
-- File list loads all at once
-- No database for metadata
-- Direct S3 operations
+- **Memory Usage**: Files stored in memory during upload
+- **Single Instance**: No load balancing
+- **No Database**: File metadata from S3 only
+- **No CDN**: Direct S3 access
 
 ### Scaling Solutions
 
-1. **Horizontal Scaling**: Load balancer + multiple servers
-2. **Database**: Store file metadata in DynamoDB/RDS
-3. **CDN**: CloudFront for static assets
-4. **Caching**: Redis for frequent queries
-5. **Serverless**: Lambda functions for API
+1. **Database Integration**: Store file metadata in database
+2. **Load Balancing**: Multiple server instances
+3. **CDN Implementation**: CloudFront for static assets
+4. **Streaming Upload**: Handle very large files efficiently
+5. **Background Processing**: Queue uploads for better performance
 
-## 🔄 Complete User Journey
+## 🎨 UI/UX Flow
 
-### First-Time User
-
-```
-1. User visits website
-2. Sees empty gallery with upload prompt
-3. Clicks upload button
-4. Drags & drops media files
-5. Files upload with progress indication
-6. Gallery refreshes showing uploaded files
-7. User can click files to preview
-8. User can search, filter, paginate
-```
-
-### Returning User
+### Responsive Design
 
 ```
-1. User visits website
-2. Gallery loads with existing files
-3. User can browse their media
-4. Upload new files if needed
-5. Search for specific files
-6. Filter by file type
-7. Download or delete files
+Desktop (≥768px)
+        ↓
+4-column gallery grid
+        ↓
+Full upload modal
+
+Tablet (768px-1024px)
+        ↓
+3-column gallery grid
+        ↓
+Optimized modal size
+
+Mobile (≤768px)
+        ↓
+2-column gallery grid
+        ↓
+Full-screen upload modal
 ```
 
-This workflow documentation provides a complete understanding of how the S3 Media Gallery functions, from user interactions to backend processing and cloud storage operations.
+### User Feedback
+
+```
+Loading States
+        ↓
+Spinner animation
+        ↓
+Progress bars for uploads
+
+Error Messages
+        ↓
+Toast notifications
+        ↓
+Clear error descriptions
+
+Success Feedback
+        ↓
+Success toasts
+        ↓
+Gallery auto-refresh
+```
+
+This workflow documentation reflects the current implementation of the S3 Media Gallery with open access, 5GB upload limits, and shared file storage.
