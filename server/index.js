@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
 const mime = require('mime-types');
+const Auth = require('./auth');
 require('dotenv').config();
 
 const app = express();
@@ -56,16 +57,83 @@ function getFileType(key) {
   return 'other';
 }
 
+// Authentication Routes
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { username, email, password } = req.body;
+    
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: 'Username, email, and password are required' });
+    }
+    
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+    }
+    
+    const result = Auth.register(username, email, password);
+    
+    if (!result.success) {
+      return res.status(400).json({ error: result.message });
+    }
+    
+    const token = Auth.generateToken(result.user);
+    res.json({ 
+      message: 'User registered successfully', 
+      token,
+      user: result.user 
+    });
+    
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+    
+    const result = Auth.login(email, password);
+    
+    if (!result.success) {
+      return res.status(401).json({ error: result.message });
+    }
+    
+    res.json({ 
+      message: 'Login successful', 
+      token: result.token,
+      user: result.user 
+    });
+    
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+app.get('/api/auth/me', Auth.authenticate, (req, res) => {
+  const user = Auth.getUserById(req.user.userId);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+  res.json({ user });
+});
+
 // API Routes
 
-// Get all files from S3 bucket
-app.get('/api/files', async (req, res) => {
+// Get all files from S3 bucket (user-specific)
+app.get('/api/files', Auth.authenticate, async (req, res) => {
   try {
-    const { prefix = '', type = 'all', search = '', page = 1, limit = 50 } = req.query;
+    const { type = 'all', search = '', page = 1, limit = 50 } = req.query;
+    const userPrefix = `users/${req.user.userId}/`;
     
     const params = {
       Bucket: BUCKET_NAME,
-      Prefix: prefix,
+      Prefix: userPrefix,
       MaxKeys: 1000
     };
 
@@ -91,7 +159,9 @@ app.get('/api/files', async (req, res) => {
       size: file.Size,
       lastModified: file.LastModified,
       type: getFileType(file.Key),
-      extension: path.extname(file.Key).toLowerCase()
+      extension: path.extname(file.Key).toLowerCase(),
+      // Remove user prefix for display
+      displayName: file.Key.replace(userPrefix, '')
     }));
     
     // Pagination
@@ -134,8 +204,8 @@ app.get('/api/files', async (req, res) => {
   }
 });
 
-// Generate pre-signed upload URL
-app.post('/api/upload-url', async (req, res) => {
+// Generate pre-signed upload URL (user-specific)
+app.post('/api/upload-url', Auth.authenticate, async (req, res) => {
   try {
     const { fileName, fileType, fileSize } = req.body;
     
@@ -148,10 +218,10 @@ app.post('/api/upload-url', async (req, res) => {
       return res.status(400).json({ error: 'File size exceeds 50MB limit' });
     }
     
-    // Generate unique key
+    // Generate unique key with user prefix
     const timestamp = Date.now();
     const randomString = Math.random().toString(36).substring(2, 8);
-    const key = `uploads/${timestamp}-${randomString}-${fileName}`;
+    const key = `users/${req.user.userId}/${timestamp}-${randomString}-${fileName}`;
     
     const params = {
       Bucket: BUCKET_NAME,
@@ -175,8 +245,8 @@ app.post('/api/upload-url', async (req, res) => {
   }
 });
 
-// Direct file upload endpoint (for smaller files)
-app.post('/api/upload', multer({ 
+// Direct file upload endpoint (for smaller files, user-specific)
+app.post('/api/upload', Auth.authenticate, multer({ 
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
   storage: multer.memoryStorage()
 }).single('file'), async (req, res) => {
@@ -187,10 +257,10 @@ app.post('/api/upload', multer({
     
     const { originalname, buffer, mimetype, size } = req.file;
     
-    // Generate unique key
+    // Generate unique key with user prefix
     const timestamp = Date.now();
     const randomString = Math.random().toString(36).substring(2, 8);
-    const key = `uploads/${timestamp}-${randomString}-${originalname}`;
+    const key = `users/${req.user.userId}/${timestamp}-${randomString}-${originalname}`;
     
     const params = {
       Bucket: BUCKET_NAME,
@@ -207,7 +277,8 @@ app.post('/api/upload', multer({
       key: result.Key,
       location: result.Location,
       size: size,
-      type: getFileType(key)
+      type: getFileType(key),
+      displayName: originalname
     });
     
   } catch (error) {
@@ -216,10 +287,16 @@ app.post('/api/upload', multer({
   }
 });
 
-// Delete file
-app.delete('/api/files/:key', async (req, res) => {
+// Delete file (user-specific)
+app.delete('/api/files/:key', Auth.authenticate, async (req, res) => {
   try {
     const { key } = req.params;
+    
+    // Ensure user can only delete their own files
+    const userPrefix = `users/${req.user.userId}/`;
+    if (!key.startsWith(userPrefix)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
     
     const params = {
       Bucket: BUCKET_NAME,
@@ -236,10 +313,16 @@ app.delete('/api/files/:key', async (req, res) => {
   }
 });
 
-// Get file info
-app.get('/api/files/:key/info', async (req, res) => {
+// Get file info (user-specific)
+app.get('/api/files/:key/info', Auth.authenticate, async (req, res) => {
   try {
     const { key } = req.params;
+    
+    // Ensure user can only access their own files
+    const userPrefix = `users/${req.user.userId}/`;
+    if (!key.startsWith(userPrefix)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
     
     const params = {
       Bucket: BUCKET_NAME,
@@ -254,7 +337,8 @@ app.get('/api/files/:key/info', async (req, res) => {
       lastModified: data.LastModified,
       contentType: data.ContentType,
       type: getFileType(key),
-      extension: path.extname(key).toLowerCase()
+      extension: path.extname(key).toLowerCase(),
+      displayName: key.replace(userPrefix, '')
     });
     
   } catch (error) {
@@ -268,9 +352,29 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Serve frontend for all other routes
+// Serve login page
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/login.html'));
+});
+
+app.get('/login.html', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/login.html'));
+});
+
+// Serve frontend for all other routes (protected)
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/index.html'));
+  // For the root path, serve the main app
+  if (req.path === '/') {
+    res.sendFile(path.join(__dirname, '../public/index.html'));
+  } else {
+    // For other paths, try to serve static files first
+    res.sendFile(path.join(__dirname, '../public', req.path), (err) => {
+      if (err) {
+        // If file not found, serve main app (for client-side routing)
+        res.sendFile(path.join(__dirname, '../public/index.html'));
+      }
+    });
+  }
 });
 
 // Error handling middleware

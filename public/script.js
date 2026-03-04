@@ -6,13 +6,46 @@ class MediaGallery {
         this.currentFilter = 'all';
         this.currentSearch = '';
         this.currentPreviewFile = null;
+        this.currentUser = null;
         
         this.init();
     }
 
     init() {
+        this.checkAuth();
         this.bindEvents();
+    }
+
+    checkAuth() {
+        if (!AuthManager.isAuthenticated()) {
+            window.location.href = '/login.html';
+            return;
+        }
+        
+        this.currentUser = AuthManager.getCurrentUser();
+        this.updateUIForUser();
         this.loadFiles();
+    }
+
+    updateUIForUser() {
+        // Update header with user info
+        const headerContent = document.querySelector('.header-content');
+        const userInfo = document.createElement('div');
+        userInfo.className = 'user-info';
+        userInfo.innerHTML = `
+            <span class="welcome-message">Welcome, ${this.currentUser.username}!</span>
+            <button class="logout-btn" id="logoutBtn">
+                <i class="fas fa-sign-out-alt"></i>
+                Logout
+            </button>
+        `;
+        
+        headerContent.appendChild(userInfo);
+        
+        // Add logout event listener
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            AuthManager.logout();
+        });
     }
 
     bindEvents() {
@@ -137,9 +170,18 @@ class MediaGallery {
                 search: this.currentSearch
             });
 
-            const response = await fetch(`/api/files?${params}`);
+            const response = await fetch(`/api/files?${params}`, {
+                headers: {
+                    'Authorization': `Bearer ${AuthManager.getToken()}`
+                }
+            });
             
             if (!response.ok) {
+                if (response.status === 401) {
+                    // Token expired, redirect to login
+                    AuthManager.logout();
+                    return;
+                }
                 throw new Error('Failed to fetch files');
             }
 
@@ -368,10 +410,17 @@ class MediaGallery {
 
         const response = await fetch('/api/upload', {
             method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${AuthManager.getToken()}`
+            },
             body: formData
         });
 
         if (!response.ok) {
+            if (response.status === 401) {
+                AuthManager.logout();
+                return;
+            }
             throw new Error('Upload failed');
         }
 
@@ -402,10 +451,17 @@ class MediaGallery {
 
         try {
             const response = await fetch(`/api/files/${encodeURIComponent(this.currentPreviewFile.key)}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${AuthManager.getToken()}`
+                }
             });
 
             if (!response.ok) {
+                if (response.status === 401) {
+                    AuthManager.logout();
+                    return;
+                }
                 throw new Error('Delete failed');
             }
 
