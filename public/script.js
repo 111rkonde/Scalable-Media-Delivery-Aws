@@ -153,10 +153,45 @@ class MediaGallery {
             this.updateStats(data.files);
             this.hideLoading();
             
+            // Load URLs lazily after gallery is rendered
+            this.lazyLoadUrls();
+            
         } catch (error) {
             console.error('Error loading files:', error);
             this.showError('Failed to load files. Please try again.');
             this.hideLoading();
+        }
+    }
+
+    async lazyLoadUrls() {
+        // Load URLs for visible items first
+        const galleryItems = document.querySelectorAll('.gallery-item');
+        const visibleItems = Array.from(galleryItems).slice(0, 12); // Load first 12 items
+        
+        for (let i = 0; i < visibleItems.length; i++) {
+            const item = visibleItems[i];
+            const fileKey = item.dataset.key;
+            const file = this.files.find(f => f.key === fileKey);
+            
+            if (file && !file.url) {
+                try {
+                    const response = await fetch(`/api/files/${encodeURIComponent(fileKey)}/url`);
+                    const data = await response.json();
+                    file.url = data.url;
+                    
+                    // Update the media element with the URL
+                    this.updateMediaElement(item, file);
+                } catch (error) {
+                    console.error('Error loading URL:', error);
+                }
+            }
+        }
+    }
+
+    updateMediaElement(item, file) {
+        const mediaElement = item.querySelector('img, video');
+        if (mediaElement) {
+            mediaElement.src = file.url;
         }
     }
 
@@ -192,12 +227,12 @@ class MediaGallery {
         
         switch (file.type) {
             case 'image':
-                mediaContent = `<img src="${file.url}" alt="${fileName}" class="gallery-item-image">`;
+                mediaContent = `<img src="" alt="${fileName}" class="gallery-item-image" loading="lazy">`;
                 break;
             case 'video':
                 mediaContent = `
                     <div class="video-wrapper">
-                        <video src="${file.url}" class="gallery-item-video"></video>
+                        <video src="" class="gallery-item-video" loading="lazy"></video>
                         <div class="video-play-button">
                             <i class="fas fa-play"></i>
                         </div>
