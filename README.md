@@ -38,6 +38,14 @@ S3-Project/
 └── README.md                 # This file
 ```
 
+## Documentation
+
+- **[Setup Guide](#setup-instructions)** - Quick start and configuration
+- **[API Documentation](#api-endpoints)** - Complete API reference
+- **[Workflow & Data Flow](WORKFLOW.md)** - How the application works
+- **[Deployment Guide](DEPLOYMENT.md)** - Production deployment options
+- **[IAM Policy](iam-policy.json)** - AWS permissions required
+
 ## Setup Instructions
 
 ### 1. Prerequisites
