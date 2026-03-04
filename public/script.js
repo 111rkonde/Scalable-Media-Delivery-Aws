@@ -195,7 +195,14 @@ class MediaGallery {
                 mediaContent = `<img src="${file.url}" alt="${fileName}" class="gallery-item-image">`;
                 break;
             case 'video':
-                mediaContent = `<video src="${file.url}" class="gallery-item-video"></video>`;
+                mediaContent = `
+                    <div class="video-wrapper">
+                        <video src="${file.url}" class="gallery-item-video"></video>
+                        <div class="video-play-button">
+                            <i class="fas fa-play"></i>
+                        </div>
+                    </div>
+                `;
                 break;
             case 'audio':
                 mediaContent = `
