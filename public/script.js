@@ -195,7 +195,15 @@ class MediaGallery {
                 mediaContent = `<img src="${file.url}" alt="${fileName}" class="gallery-item-image">`;
                 break;
             case 'video':
-                mediaContent = `<video src="${file.url}" class="gallery-item-video"></video>`;
+                mediaContent = `
+                    <div class="video-container">
+                        <video src="${file.url}" class="gallery-item-video" poster="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgPHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9IiNmOGY5ZmEiLz4KICA8Y2lyY2xlIGN4PSIxMDAiIGN5PSI4MCIgcj0iMjAiIGZpbGw9IiM2NjdlZWEiLz4KICA8cG9seWdvbiBwb2ludHM9IjkwLDcwIDkwLDkwIDExMCw4MCIgZmlsbD0id2hpdGUiLz4KICA8dGV4dCB4PSIxMDAiIHk9IjE0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzY2N2VlYSIgZm9udC1zaXplPSIxNCIgZm9udC1mYW1pbHk9IkFyaWFsIj5WaWRlbzwvdGV4dD4KPC9zdmc+">
+                            <div class="video-play-overlay">
+                                <i class="fas fa-play"></i>
+                            </div>
+                        </video>
+                    </div>
+                `;
                 break;
             case 'audio':
                 mediaContent = `
