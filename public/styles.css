@@ -278,15 +278,19 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     gap: 1.5rem;
+    background: yellow !important; /* Temporary debug background */
+    min-height: 300px !important; /* Ensure minimum height */
 }
 
 .gallery-item {
     background: white;
     border-radius: 10px;
     overflow: hidden;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     transition: all 0.3s ease;
     cursor: pointer;
+    border: 2px solid red !important; /* Temporary debug border */
+    min-height: 250px !important; /* Ensure minimum height */
 }
 
 .gallery-item:hover {
@@ -299,6 +303,8 @@ body {
     height: 200px;
     object-fit: cover;
     background: #f8f9fa;
+    display: block;
+    border-radius: 0;
 }
 
 .gallery-item-video {
