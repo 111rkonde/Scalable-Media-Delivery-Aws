@@ -302,6 +302,71 @@ class MediaGallery {
         modal.classList.add('active');
     }
 
+    async showDeleteConfirmation(file) {
+        return new Promise((resolve) => {
+            // Create modal overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'delete-confirmation-overlay';
+            overlay.innerHTML = `
+                <div class="delete-confirmation-modal">
+                    <div class="delete-confirmation-content">
+                        <div class="delete-confirmation-icon">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <h3>Delete File?</h3>
+                        <p>Are you sure you want to delete <strong>${file.key.split('/').pop()}</strong>?</p>
+                        <p class="delete-warning">This action cannot be undone.</p>
+                        <div class="delete-confirmation-actions">
+                            <button class="delete-cancel-btn" id="deleteCancel">
+                                <i class="fas fa-times"></i>
+                                Cancel
+                            </button>
+                            <button class="delete-confirm-btn" id="deleteConfirm">
+                                <i class="fas fa-trash"></i>
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Add to body
+            document.body.appendChild(overlay);
+
+            // Add event listeners
+            const cancelBtn = document.getElementById('deleteCancel');
+            const confirmBtn = document.getElementById('deleteConfirm');
+
+            cancelBtn.addEventListener('click', () => {
+                document.body.removeChild(overlay);
+                resolve(false);
+            });
+
+            confirmBtn.addEventListener('click', () => {
+                document.body.removeChild(overlay);
+                resolve(true);
+            });
+
+            // Close on overlay click
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    document.body.removeChild(overlay);
+                    resolve(false);
+                }
+            });
+
+            // Close on Escape key
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    document.body.removeChild(overlay);
+                    document.removeEventListener('keydown', handleEscape);
+                    resolve(false);
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+        });
+    }
+
     hidePreviewModal() {
         document.getElementById('previewModal').classList.remove('active');
         this.currentPreviewFile = null;
@@ -419,7 +484,8 @@ class MediaGallery {
     async deleteFile() {
         if (!this.currentPreviewFile) return;
 
-        if (!confirm('Are you sure you want to delete this file?')) {
+        const confirmed = await this.showDeleteConfirmation(this.currentPreviewFile);
+        if (!confirmed) {
             return;
         }
 
