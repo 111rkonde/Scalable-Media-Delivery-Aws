@@ -13,9 +13,26 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+      fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      scriptSrc: ["'self'"],
+      connectSrc: ["'self'", "https://*.amazonaws.com"]
+    }
+  }
+}));
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: [
+    process.env.CORS_ORIGIN || 'http://localhost:3000',
+    'http://192.168.31.114:3000',
+    'http://192.168.112.1:3000',
+    'http://192.168.146.1:3000',
+    /^http:\/\/192\.168\.\d+\.\d+:3000$/  // Allow any local IP
+  ],
   credentials: true
 }));
 
@@ -33,6 +50,19 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Serve static frontend
 app.use(express.static(path.join(__dirname, '../public')));
+
+// Explicit routes for static files (helps with mobile access)
+app.get('/styles.css', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/styles.css'));
+});
+
+app.get('/script.js', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/script.js'));
+});
+
+app.get('/index.html', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/index.html'));
+});
 
 // AWS S3 Configuration
 const s3 = new AWS.S3({
@@ -280,8 +310,8 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`Frontend: http://localhost:${PORT}`);
-  console.log(`API: http://localhost:${PORT}/api`);
+  console.log(`Local: http://localhost:${PORT}`);
+  console.log(`Network: http://0.0.0.0:${PORT}`);
 });
