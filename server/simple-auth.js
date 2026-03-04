@@ -1,45 +1,49 @@
-const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
 // Simple in-memory user store (in production, use a database)
 const users = new Map();
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const sessions = new Map();
 
-class Auth {
+class SimpleAuth {
   // Hash password
   static hashPassword(password) {
     return crypto.createHash('sha256').update(password).digest('hex');
   }
 
-  // Generate JWT token
-  static generateToken(user) {
-    if (!jwt || !jwt.sign) {
-      console.error('JWT library not properly imported');
-      return null;
-    }
-    return jwt.sign(
-      { 
-        userId: user.id, 
-        email: user.email,
-        username: user.username 
-      },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
+  // Generate session token
+  static generateSessionToken() {
+    return crypto.randomBytes(32).toString('hex');
   }
 
-  // Verify JWT token
-  static verifyToken(token) {
-    try {
-      if (!jwt || !jwt.verify) {
-        console.error('JWT library not properly imported');
-        return null;
-      }
-      return jwt.verify(token, JWT_SECRET);
-    } catch (error) {
-      console.error('JWT verification error:', error);
+  // Create session
+  static createSession(user) {
+    const token = this.generateSessionToken();
+    const session = {
+      userId: user.id,
+      username: user.username,
+      email: user.email,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
+    };
+    
+    sessions.set(token, session);
+    return token;
+  }
+
+  // Verify session
+  static verifySession(token) {
+    const session = sessions.get(token);
+    if (!session) {
       return null;
     }
+    
+    // Check if session expired
+    if (new Date() > new Date(session.expiresAt)) {
+      sessions.delete(token);
+      return null;
+    }
+    
+    return session;
   }
 
   // Register new user
@@ -82,7 +86,7 @@ class Auth {
     
     for (let [id, user] of users.entries()) {
       if (user.email === email && user.password === hashedPassword) {
-        const token = this.generateToken(user);
+        const token = this.createSession(user);
         return {
           success: true,
           token,
@@ -115,7 +119,7 @@ class Auth {
 
   // Middleware to protect routes
   static authenticate(req, res, next) {
-    console.log('Auth middleware called');
+    console.log('SimpleAuth middleware called');
     const token = req.header('Authorization')?.replace('Bearer ', '');
     
     console.log('Token received:', token ? 'Present' : 'Missing');
@@ -125,17 +129,22 @@ class Auth {
       return res.status(401).json({ error: 'Access denied. No token provided.' });
     }
 
-    const decoded = this.verifyToken(token);
-    console.log('Token verification result:', decoded ? 'Valid' : 'Invalid');
+    const session = this.verifySession(token);
+    console.log('Session verification result:', session ? 'Valid' : 'Invalid');
     
-    if (!decoded) {
-      console.log('Invalid token');
+    if (!session) {
+      console.log('Invalid session');
       return res.status(401).json({ error: 'Invalid token.' });
     }
 
-    req.user = decoded;
-    console.log('User authenticated:', decoded.username);
+    req.user = session;
+    console.log('User authenticated:', session.username);
     next();
+  }
+
+  // Logout
+  static logout(token) {
+    sessions.delete(token);
   }
 
   // Get all users (for admin purposes)
@@ -153,4 +162,4 @@ class Auth {
   }
 }
 
-module.exports = Auth;
+module.exports = SimpleAuth;

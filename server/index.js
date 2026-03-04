@@ -7,7 +7,7 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
 const mime = require('mime-types');
-const Auth = require('./auth');
+const SimpleAuth = require('./simple-auth');
 require('dotenv').config();
 
 const app = express();
@@ -70,13 +70,13 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters long' });
     }
     
-    const result = Auth.register(username, email, password);
+    const result = SimpleAuth.register(username, email, password);
     
     if (!result.success) {
       return res.status(400).json({ error: result.message });
     }
     
-    const token = Auth.generateToken(result.user);
+    const token = SimpleAuth.createSession(result.user);
     res.json({ 
       message: 'User registered successfully', 
       token,
@@ -97,7 +97,7 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
     
-    const result = Auth.login(email, password);
+    const result = SimpleAuth.login(email, password);
     
     if (!result.success) {
       return res.status(401).json({ error: result.message });
@@ -115,8 +115,8 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-app.get('/api/auth/me', Auth.authenticate, (req, res) => {
-  const user = Auth.getUserById(req.user.userId);
+app.get('/api/auth/me', SimpleAuth.authenticate, (req, res) => {
+  const user = SimpleAuth.getUserById(req.user.userId);
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
   }
@@ -126,7 +126,7 @@ app.get('/api/auth/me', Auth.authenticate, (req, res) => {
 // API Routes
 
 // Get all files from S3 bucket (user-specific)
-app.get('/api/files', Auth.authenticate, async (req, res) => {
+app.get('/api/files', SimpleAuth.authenticate, async (req, res) => {
   try {
     const { type = 'all', search = '', page = 1, limit = 50 } = req.query;
     const userPrefix = `users/${req.user.userId}/`;
@@ -205,7 +205,7 @@ app.get('/api/files', Auth.authenticate, async (req, res) => {
 });
 
 // Generate pre-signed upload URL (user-specific)
-app.post('/api/upload-url', Auth.authenticate, async (req, res) => {
+app.post('/api/upload-url', SimpleAuth.authenticate, async (req, res) => {
   try {
     const { fileName, fileType, fileSize } = req.body;
     
@@ -246,12 +246,19 @@ app.post('/api/upload-url', Auth.authenticate, async (req, res) => {
 });
 
 // Direct file upload endpoint (for smaller files, user-specific)
-app.post('/api/upload', Auth.authenticate, multer({ 
+app.post('/api/upload', SimpleAuth.authenticate, multer({ 
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
   storage: multer.memoryStorage()
 }).single('file'), async (req, res) => {
   try {
+    console.log('Upload request received:', {
+      user: req.user,
+      file: req.file ? req.file.originalname : 'No file',
+      size: req.file ? req.file.size : 0
+    });
+
     if (!req.file) {
+      console.log('No file in request');
       return res.status(400).json({ error: 'No file uploaded' });
     }
     
@@ -262,6 +269,8 @@ app.post('/api/upload', Auth.authenticate, multer({
     const randomString = Math.random().toString(36).substring(2, 8);
     const key = `users/${req.user.userId}/${timestamp}-${randomString}-${originalname}`;
     
+    console.log('Uploading to S3:', { key, size, mimetype });
+    
     const params = {
       Bucket: BUCKET_NAME,
       Key: key,
@@ -271,6 +280,7 @@ app.post('/api/upload', Auth.authenticate, multer({
     };
     
     const result = await s3.upload(params).promise();
+    console.log('S3 upload successful:', result.Location);
     
     res.json({
       message: 'File uploaded successfully',
@@ -283,12 +293,12 @@ app.post('/api/upload', Auth.authenticate, multer({
     
   } catch (error) {
     console.error('Error uploading file:', error);
-    res.status(500).json({ error: 'Failed to upload file' });
+    res.status(500).json({ error: 'Failed to upload file: ' + error.message });
   }
 });
 
 // Delete file (user-specific)
-app.delete('/api/files/:key', Auth.authenticate, async (req, res) => {
+app.delete('/api/files/:key', SimpleAuth.authenticate, async (req, res) => {
   try {
     const { key } = req.params;
     
@@ -314,7 +324,7 @@ app.delete('/api/files/:key', Auth.authenticate, async (req, res) => {
 });
 
 // Get file info (user-specific)
-app.get('/api/files/:key/info', Auth.authenticate, async (req, res) => {
+app.get('/api/files/:key/info', SimpleAuth.authenticate, async (req, res) => {
   try {
     const { key } = req.params;
     
