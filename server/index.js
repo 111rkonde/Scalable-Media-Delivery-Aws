@@ -98,9 +98,26 @@ app.get('/api/files', async (req, res) => {
     const endIndex = startIndex + parseInt(limit);
     const paginatedFiles = filesWithMetadata.slice(startIndex, endIndex);
     
-    // Return files without URLs for faster loading
+    // Generate signed URLs for each file
+    const filesWithUrls = await Promise.all(
+      paginatedFiles.map(async (file) => {
+        const urlParams = {
+          Bucket: BUCKET_NAME,
+          Key: file.key,
+          Expires: 3600 // 1 hour
+        };
+        
+        const signedUrl = await s3.getSignedUrlPromise('getObject', urlParams);
+        
+        return {
+          ...file,
+          url: signedUrl
+        };
+      })
+    );
+    
     res.json({
-      files: paginatedFiles,
+      files: filesWithUrls,
       pagination: {
         currentPage: parseInt(page),
         totalPages: Math.ceil(filesWithMetadata.length / limit),
@@ -215,30 +232,6 @@ app.delete('/api/files/:key', async (req, res) => {
   } catch (error) {
     console.error('Error deleting file:', error);
     res.status(500).json({ error: 'Failed to delete file' });
-  }
-});
-
-// Get signed URL for a specific file
-app.get('/api/files/:key/url', async (req, res) => {
-  try {
-    const { key } = req.params;
-    
-    const urlParams = {
-      Bucket: BUCKET_NAME,
-      Key: key,
-      Expires: 3600 // 1 hour
-    };
-    
-    const signedUrl = await s3.getSignedUrlPromise('getObject', urlParams);
-    
-    res.json({
-      key: key,
-      url: signedUrl
-    });
-    
-  } catch (error) {
-    console.error('Error generating signed URL:', error);
-    res.status(500).json({ error: 'Failed to generate signed URL' });
   }
 });
 
