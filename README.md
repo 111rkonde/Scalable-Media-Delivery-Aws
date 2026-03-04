@@ -249,3 +249,7 @@ For issues and questions:
 ---
 
 **Note**: Always keep your AWS credentials secure and never commit them to version control. Use environment variables or AWS IAM roles for production deployments.
+=======
+# Scalable-Media-Delivery-Aws
+A secure and scalable media streaming platform built using AWS S3, EC2, and signed URL authentication. Supports image, video, and audio streaming with private bucket access.
+>>>>>>> 8adf71ad436b6194b30567d559bbe82e602312e9
