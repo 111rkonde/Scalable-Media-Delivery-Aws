@@ -7,7 +7,6 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
 const mime = require('mime-types');
-const SimpleAuth = require('./simple-auth');
 require('dotenv').config();
 
 const app = express();
@@ -57,83 +56,15 @@ function getFileType(key) {
   return 'other';
 }
 
-// Authentication Routes
-app.post('/api/auth/register', async (req, res) => {
-  try {
-    const { username, email, password } = req.body;
-    
-    if (!username || !email || !password) {
-      return res.status(400).json({ error: 'Username, email, and password are required' });
-    }
-    
-    if (password.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters long' });
-    }
-    
-    const result = SimpleAuth.register(username, email, password);
-    
-    if (!result.success) {
-      return res.status(400).json({ error: result.message });
-    }
-    
-    const token = SimpleAuth.createSession(result.user);
-    res.json({ 
-      message: 'User registered successfully', 
-      token,
-      user: result.user 
-    });
-    
-  } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ error: 'Registration failed' });
-  }
-});
-
-app.post('/api/auth/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
-    }
-    
-    const result = SimpleAuth.login(email, password);
-    
-    if (!result.success) {
-      return res.status(401).json({ error: result.message });
-    }
-    
-    res.json({ 
-      message: 'Login successful', 
-      token: result.token,
-      user: result.user 
-    });
-    
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Login failed' });
-  }
-});
-
-app.get('/api/auth/me', SimpleAuth.authenticate, (req, res) => {
-  const user = SimpleAuth.getUserById(req.user.userId);
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
-  }
-  res.json({ user });
-});
-
 // API Routes
 
-// Get all files from S3 bucket (user-specific)
-app.get('/api/files', SimpleAuth.authenticate, async (req, res) => {
+// Get all files from S3 bucket
+app.get('/api/files', async (req, res) => {
   try {
     const { type = 'all', search = '', page = 1, limit = 50 } = req.query;
-    const userPrefix = `users/${req.user.userId}/`;
     
     const params = {
       Bucket: BUCKET_NAME,
-      Prefix: userPrefix,
       MaxKeys: 1000
     };
 
@@ -159,9 +90,7 @@ app.get('/api/files', SimpleAuth.authenticate, async (req, res) => {
       size: file.Size,
       lastModified: file.LastModified,
       type: getFileType(file.Key),
-      extension: path.extname(file.Key).toLowerCase(),
-      // Remove user prefix for display
-      displayName: file.Key.replace(userPrefix, '')
+      extension: path.extname(file.Key).toLowerCase()
     }));
     
     // Pagination
@@ -204,8 +133,8 @@ app.get('/api/files', SimpleAuth.authenticate, async (req, res) => {
   }
 });
 
-// Generate pre-signed upload URL (user-specific)
-app.post('/api/upload-url', SimpleAuth.authenticate, async (req, res) => {
+// Generate pre-signed upload URL
+app.post('/api/upload-url', async (req, res) => {
   try {
     const { fileName, fileType, fileSize } = req.body;
     
@@ -218,10 +147,10 @@ app.post('/api/upload-url', SimpleAuth.authenticate, async (req, res) => {
       return res.status(400).json({ error: 'File size exceeds 50MB limit' });
     }
     
-    // Generate unique key with user prefix
+    // Generate unique key
     const timestamp = Date.now();
     const randomString = Math.random().toString(36).substring(2, 8);
-    const key = `users/${req.user.userId}/${timestamp}-${randomString}-${fileName}`;
+    const key = `uploads/${timestamp}-${randomString}-${fileName}`;
     
     const params = {
       Bucket: BUCKET_NAME,
@@ -245,31 +174,22 @@ app.post('/api/upload-url', SimpleAuth.authenticate, async (req, res) => {
   }
 });
 
-// Direct file upload endpoint (for smaller files, user-specific)
-app.post('/api/upload', SimpleAuth.authenticate, multer({ 
+// Direct file upload endpoint (for smaller files)
+app.post('/api/upload', multer({ 
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
   storage: multer.memoryStorage()
 }).single('file'), async (req, res) => {
   try {
-    console.log('Upload request received:', {
-      user: req.user,
-      file: req.file ? req.file.originalname : 'No file',
-      size: req.file ? req.file.size : 0
-    });
-
     if (!req.file) {
-      console.log('No file in request');
       return res.status(400).json({ error: 'No file uploaded' });
     }
     
     const { originalname, buffer, mimetype, size } = req.file;
     
-    // Generate unique key with user prefix
+    // Generate unique key
     const timestamp = Date.now();
     const randomString = Math.random().toString(36).substring(2, 8);
-    const key = `users/${req.user.userId}/${timestamp}-${randomString}-${originalname}`;
-    
-    console.log('Uploading to S3:', { key, size, mimetype });
+    const key = `uploads/${timestamp}-${randomString}-${originalname}`;
     
     const params = {
       Bucket: BUCKET_NAME,
@@ -280,33 +200,25 @@ app.post('/api/upload', SimpleAuth.authenticate, multer({
     };
     
     const result = await s3.upload(params).promise();
-    console.log('S3 upload successful:', result.Location);
     
     res.json({
       message: 'File uploaded successfully',
       key: result.Key,
       location: result.Location,
       size: size,
-      type: getFileType(key),
-      displayName: originalname
+      type: getFileType(key)
     });
     
   } catch (error) {
     console.error('Error uploading file:', error);
-    res.status(500).json({ error: 'Failed to upload file: ' + error.message });
+    res.status(500).json({ error: 'Failed to upload file' });
   }
 });
 
-// Delete file (user-specific)
-app.delete('/api/files/:key', SimpleAuth.authenticate, async (req, res) => {
+// Delete file
+app.delete('/api/files/:key', async (req, res) => {
   try {
     const { key } = req.params;
-    
-    // Ensure user can only delete their own files
-    const userPrefix = `users/${req.user.userId}/`;
-    if (!key.startsWith(userPrefix)) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
     
     const params = {
       Bucket: BUCKET_NAME,
@@ -323,16 +235,10 @@ app.delete('/api/files/:key', SimpleAuth.authenticate, async (req, res) => {
   }
 });
 
-// Get file info (user-specific)
-app.get('/api/files/:key/info', SimpleAuth.authenticate, async (req, res) => {
+// Get file info
+app.get('/api/files/:key/info', async (req, res) => {
   try {
     const { key } = req.params;
-    
-    // Ensure user can only access their own files
-    const userPrefix = `users/${req.user.userId}/`;
-    if (!key.startsWith(userPrefix)) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
     
     const params = {
       Bucket: BUCKET_NAME,
@@ -347,8 +253,7 @@ app.get('/api/files/:key/info', SimpleAuth.authenticate, async (req, res) => {
       lastModified: data.LastModified,
       contentType: data.ContentType,
       type: getFileType(key),
-      extension: path.extname(key).toLowerCase(),
-      displayName: key.replace(userPrefix, '')
+      extension: path.extname(key).toLowerCase()
     });
     
   } catch (error) {
@@ -362,16 +267,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Serve login page
-app.get('/login', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/login.html'));
-});
-
-app.get('/login.html', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/login.html'));
-});
-
-// Serve frontend for all other routes (protected)
+// Serve frontend for all routes
 app.get('*', (req, res) => {
   // For the root path, serve the main app
   if (req.path === '/') {
