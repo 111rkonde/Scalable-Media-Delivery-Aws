@@ -13,18 +13,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Security middleware
-app.use(helmet({
-  contentSecurityPolicy: false, // Disable CSP temporarily for mobile testing
-  crossOriginEmbedderPolicy: false
-}));
+app.use(helmet());
 app.use(cors({
-  origin: [
-    process.env.CORS_ORIGIN || 'http://localhost:3000',
-    'http://192.168.31.114:3000',
-    'http://192.168.112.1:3000',
-    'http://192.168.146.1:3000',
-    /^http:\/\/192\.168\.\d+\.\d+:3000$/  // Allow any local IP
-  ],
+  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
   credentials: true
 }));
 
@@ -32,13 +23,7 @@ app.use(cors({
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
-  trustProxy: true,
-  skip: (req) => {
-    // Skip rate limiting for local network requests
-    const ip = req.ip || req.connection.remoteAddress;
-    return ip && (ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.'));
-  }
+  message: 'Too many requests from this IP, please try again later.'
 });
 app.use('/api/', limiter);
 
@@ -48,19 +33,6 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Serve static frontend
 app.use(express.static(path.join(__dirname, '../public')));
-
-// Explicit routes for static files (helps with mobile access)
-app.get('/styles.css', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/styles.css'));
-});
-
-app.get('/script.js', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/script.js'));
-});
-
-app.get('/index.html', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/index.html'));
-});
 
 // AWS S3 Configuration
 const s3 = new AWS.S3({
@@ -293,23 +265,7 @@ app.get('/api/files/:key/info', async (req, res) => {
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    ip: req.ip,
-    userAgent: req.get('User-Agent'),
-    headers: req.headers
-  });
-});
-
-// Debug endpoint for mobile testing
-app.get('/api/debug', (req, res) => {
-  res.json({
-    message: 'Debug endpoint works!',
-    ip: req.ip,
-    headers: req.headers,
-    timestamp: new Date().toISOString()
-  });
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
 // Serve frontend for all other routes
@@ -324,8 +280,8 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`Local: http://localhost:${PORT}`);
-  console.log(`Network: http://0.0.0.0:${PORT}`);
+  console.log(`Frontend: http://localhost:${PORT}`);
+  console.log(`API: http://localhost:${PORT}/api`);
 });
