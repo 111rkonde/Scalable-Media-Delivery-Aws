@@ -313,6 +313,12 @@ body {
     height: 200px;
     overflow: hidden;
     border-radius: 10px 10px 0 0;
+    cursor: pointer;
+}
+
+.video-container:hover .gallery-item-video {
+    transform: scale(1.05);
+    transition: transform 0.3s ease;
 }
 
 .video-play-overlay {
@@ -331,11 +337,13 @@ body {
     font-size: 18px;
     pointer-events: none;
     transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 }
 
 .gallery-item:hover .video-play-overlay {
     background: rgba(118, 75, 162, 0.9);
     transform: translate(-50%, -50%) scale(1.1);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
 }
 
 .gallery-item-audio {
